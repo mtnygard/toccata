@@ -11,6 +11,9 @@ RUN apt-get update \
         llvm-3.9-dev \
         zlib1g \
         zlib1g-dev \
+        linux-base \
+        linux-perf-4.9 \
+        procps \
     && rm -rf /var/lib/apt/lists*
 
 # Uncomment this when you have a good net connection
