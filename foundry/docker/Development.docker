@@ -8,6 +8,9 @@ RUN apt-get update \
         git \
         make \
         clang-3.9 \
+        llvm-3.9-dev \
+        zlib1g \
+        zlib1g-dev \
     && rm -rf /var/lib/apt/lists*
 
 # Uncomment this when you have a good net connection
