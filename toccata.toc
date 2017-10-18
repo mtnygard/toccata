@@ -1,7 +1,7 @@
 
 (add-ns rdr (git-dependency "https://github.com/Toccata-Lang/reader.git"
                             "reader.toc"
-                            :sha "4e060ab"))
+                            :sha "e9ba534"))
 (add-ns rd (git-dependency "https://github.com/Toccata-Lang/recursive-descent.git"
                            "recursive-descent.toc"
                            :sha "cfa630d"))
@@ -10,7 +10,7 @@
                              :sha "1616a3a"))
 (add-ns sys (git-dependency "https://github.com/Toccata-Lang/system.git"
                             "system.toc"
-                            :sha "bed3aa7"))
+                            :sha "956a8bb"))
 (add-ns sm (git-dependency "https://github.com/Toccata-Lang/state-maybe.git"
                            "state-maybe.toc"
                            :sha "b41dd1d"))
@@ -319,7 +319,8 @@
 
 (defn sym-ns-path [sym]
   (comp (for [ns-sym (sm/when (rdr/namespace sym))
-              path (sm/get-in-val [.namespaces (ast/file-name sym) ns-sym])]
+              path (comp (sm/get-in-val [.namespaces (ast/file-name sym) ns-sym])
+                         (sm/get-in-val [.namespaces (ast/file-name sym) (rdr/tag ns-sym)]))]
           path)
         (sm/state-maybe (ast/file-name sym))))
 
@@ -879,7 +880,6 @@
 
   (emit-defined-value [sym defined-sym]
     (for [value (lookup-sym sym)
-          _ (debug 'defined-tagged defined-sym)
           _ (new-module-def defined-sym value)]
       [(make-c-code value)]))
 
@@ -2690,8 +2690,7 @@
       (send ast-emitter
             (fn [context]
               (update-context context
-                              (sm/assoc-in-val [.namespaces (ast/file-name ast)
-                                                (rdr/tag (.ns-sym ast))]
+                              (sm/assoc-in-val [.namespaces (ast/file-name ast) (.ns-sym ast)]
                                                mod-file-name))))
       waiter)))
 
@@ -2760,7 +2759,9 @@
             waiter (promise)]
         (or (map (file-directory file-name)
                  (fn [root-dir]
-                   (write-strings "\n#include <stdlib.h>\n#include \"core.h\"\n")
+                   (write-strings ["\n#define _XOPEN_SOURCE 600"
+                                   "\n#include <stdlib.h>"
+                                   "\n#include \"core.h\"\n"])
                    (send module-compiler compile-module file-name waiter root-dir root-dir)))
             (do
               (print-err "Could not find " (str "'" file-name "'"))
