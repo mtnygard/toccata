@@ -175,6 +175,8 @@
   ;; For AST nodes that can be assigned to a symbol at the top level
   (emit-defined-value [ast defined-sym])
 
+  ;; why is this defined by the AST at analysis time? does every form that could evaluate to a value meet the defined-value test?
+
   ;; For AST nodes that can appear at the top level of a file
   (emit-definition [_])
 
@@ -187,6 +189,9 @@
   ;; Emit a call expression if the call target is a tagged-symbol. Otherwise, fail
   (emit-call-expr [target-ast args]
     (zero sm/state-maybe))
+
+    ;; does this mean computed function values are not allowed?
+    ;; e.g., ((get-in [.x] methods) 10)
 
   ;; replace all occurances of the keys in 'subs' with their associated values
   (replace-syms [ast subs])
@@ -967,6 +972,7 @@
           _ (new-module-def defined-sym (c-code c-var [] [] type-num {}))]
       [(c-code "" [] ["Value *" c-var " = " (.txt ast) ";" line-sep] type-num {})]))
 
+  ;; why test for lang equality, then emit c code? Does something else guarantee target-lang is always C when arriving here?
   (emit-definition [ast]
     (for [target-lang (sm/get-val .target-lang)
           :when (= (.lang ast) target-lang)
@@ -2586,6 +2592,7 @@
 (def module-compiler (agent {}))
 
 (defprotocol ASTEmitter
+;; does this need to be part of the protocol? it's only used once, and only monomorphically.
   (send-to-emitter [ast]
     (send ast-emitter emit-ast ast))
   (add-namespace [ast root-dir proj-dir])
@@ -2704,6 +2711,7 @@
                                               rdr/read-add-ns
                                               (grmr/get-value 'root-directory)
                                               (grmr/get-value 'project-directory))))
+                ;; using send-to-emitter here means we can't use analyze-forms for anything but emitting C code.
                (grmr/apply-fn send-to-emitter
                               rdr/top-level)))))
 
