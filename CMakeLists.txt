@@ -20,21 +20,21 @@ configure_file(config.h.in config.h)
 set(CORE_LIBS pthread)
 
 add_executable(toccata toccata.c core.c config.h)
+target_sources(toccata INTERFACE core.h)
 target_link_libraries(toccata ${CORE_LIBS} ${llvm_libs})
 
 add_library(toccata-core STATIC core.c core.h config.h)
-#set_target_properties(toccata-core PROPERTIES PUBLIC_HEADER core.h)
-#set_target_properties(toccata-core PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 add_subdirectory(examples)
+
+enable_testing()
+add_subdirectory(regression-tests)
 
 add_custom_target(core SOURCES core.toc)
 
 install(TARGETS toccata-core toccata
         RUNTIME DESTINATION bin 
-        ARCHIVE DESTINATION lib 
-        PUBLIC_HEADER DESTINATION include/toccata
-        )
+        ARCHIVE DESTINATION lib)
 
 install(FILES core.h ${CMAKE_CURRENT_BINARY_DIR}/config.h
         DESTINATION ${CMAKE_INSTALL_PREFIX}/include/toccata)
