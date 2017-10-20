@@ -31,6 +31,24 @@ Make sure you have `git` and `clang` installed. `clang` is part of the LLVM proj
 
       export PATH=$PATH:$TOCCATA_DIR
     
+# Building with CMake
+
+We have a CMake setup for build automation. CMake recommends that you build from a different location than sources, like so:
+
+* `mkdir build; cd build; cmake ..; make`
+
+This will build the compiler, examples, and regression tests. It doesn't run the test, though. To do that, run `ctest` from inside the build directory.
+
+# Using the Docker container
+
+We have a dev container definition. You can use it to develop, build, and test Toccata on Linux. 
+
+* Use the `foundry/docker` directory.
+* `build-devenv` creates the container. It imports the current source tree into the container.
+* `enter-dev` gives you a shell inside the container.
+
+Keep in mind that the container has a _copy_ of the sources. It's not a shared directory. If you make changes inside the container, you should either commit them from there or copy the changes back out of the container.
+
 # Compile your first program
 
 * Paste this text to a file named `hw.toc`
