@@ -1,0 +1,60 @@
+(inline C "
+#include \"llvm-c/Core.h\"
+
+void destroy_llvm_context(void *ctx) {
+    if(ctx) {
+        LLVMContextDispose((LLVMContextRef)ctx);
+    }
+}
+
+void dispose_llvm_module(void *module) {
+    if (module) {
+        LLVMDisposeModule((LLVMModuleRef)module);
+    }
+}
+")
+
+(defn llvm-context-create []
+    (inline C Maybe "
+        LLVMContextRef ctx = LLVMContextCreate();
+
+        if (ctx) {
+            printf(\"Context ref: %lx\\n\", ctx);
+            Value* v = opaqueValue(ctx, &destroy_llvm_context);
+            return(maybe((List *)0, (Value *)0, v));
+        } else {
+            return(nothing);
+        }
+    "))
+
+(defn llvm-context-create-module [context name]
+    (inline C Maybe "
+        LLVMContextRef ctx = ((Opaque*)context_0)->ptr;
+        String* nameStr = nullTerm(name_1);
+        printf(\"Context ref: %lx\\n\", ctx);
+        LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(nameStr->buffer, ctx);
+
+        if (mod) {
+            Value *v = opaqueValue(mod, &dispose_llvm_module);
+            dec_and_free((Value *)nameStr, 1);
+            dec_and_free(context_0, 1);
+            return maybe((List *)0, (Value *)0, v);
+        } else {
+            dec_and_free((Value *)nameStr, 1);
+            dec_and_free(context_0, 1);
+            return nothing;
+        }
+    "))
+
+
+(defn fooish [llvm]
+    (let [x (flat-map llvm (fn [c] (llvm-context-create-module c "foo")))]
+        (println "module has value?" (and x "yes"))
+        ))
+
+(main [& args]
+    (let [llvm (llvm-context-create)]
+        (println "llvm has value?" (and llvm "yes"))
+        (fooish llvm)
+        (println "This is the day")
+        ))
