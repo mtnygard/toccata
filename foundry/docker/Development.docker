@@ -16,6 +16,7 @@ RUN apt-get update \
         procps \
         lldb-3.9 \
         gdb \
+        dos2unix \
     && rm -rf /var/lib/apt/lists*
 
 # Uncomment this when you have a good net connection
@@ -42,6 +43,8 @@ RUN \
 WORKDIR /home/$USER
 
 COPY foundry/docker/bashrc .bashrc
+
+RUN dos2unix .bashrc
 
 ADD . toccata
 
