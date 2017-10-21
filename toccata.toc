@@ -2775,6 +2775,7 @@
               (print-err "Could not find " (str "'" file-name "'"))
               (abort)))
         (extract waiter)
+        ;; Are separate compilation units supported?
         (send ast-emitter emit-main)
         (send ast-emitter finalize-protocols)
         (send ast-emitter fixup-native-symbols)
