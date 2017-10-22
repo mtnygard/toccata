@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9.0)
 
 project(toccata VERSION 0.1.0)
 
-add_definitions(-std=c99 -fno-objc-arc)
+add_definitions(-std=c99)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

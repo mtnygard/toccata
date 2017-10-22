@@ -29,12 +29,11 @@ foreach(test ${test_sources})
         COMMAND sh ${CMAKE_BINARY_DIR}/build-test ${CMAKE_CURRENT_SOURCE_DIR}/${test}.toc >${CMAKE_CURRENT_BINARY_DIR}/${test}.c
         DEPENDS ${test}.toc)
 
-    add_definitions(-std=c99 -fno-objc-arc)
-
     include_directories(${CMAKE_SOURCE_DIR})
 
     add_executable(${test} ${CMAKE_CURRENT_BINARY_DIR}/${test}.c)
-    target_link_libraries(${test} toccata-core ${CORE_LIBS})
+    target_link_libraries(${test} toccata-core Threads::Threads)
+
     add_test(NAME ${test} 
              COMMAND ${test})
 endforeach(test)

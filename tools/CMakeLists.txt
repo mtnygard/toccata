@@ -19,7 +19,7 @@ foreach(tool ${tool-sources})
                     COMMAND toccata ${CMAKE_CURRENT_SOURCE_DIR}/${tool}.toc >${CMAKE_CURRENT_BINARY_DIR}/${tool}.c
                     DEPENDS ${tool}.toc)
 
-    add_definitions(-std=c99 -fno-objc-arc)
+    add_definitions(-std=c99)
     
     add_executable(${tool} ${tool}.c)
     target_link_libraries(${tool} toccata-core ${CORE_LIBS} ${llvm_libs})
