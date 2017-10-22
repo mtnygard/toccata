@@ -17,7 +17,7 @@ set(test_sources
     main17
     test-for
     test-gensym
-#    test-regressions
+    test-regressions
     test-threading
 )
 
