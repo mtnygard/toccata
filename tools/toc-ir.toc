@@ -3,12 +3,14 @@
 
 void destroy_llvm_context(void *ctx) {
     if(ctx) {
+        printf(\"Disposing context: %lx\\n\", ctx);
         LLVMContextDispose((LLVMContextRef)ctx);
     }
 }
 
 void dispose_llvm_module(void *module) {
     if (module) {
+        printf(\"Disposing module: %lx\\n\", module);
         LLVMDisposeModule((LLVMModuleRef)module);
     }
 }
@@ -31,11 +33,12 @@ void dispose_llvm_module(void *module) {
     (inline C Maybe "
         LLVMContextRef ctx = ((Opaque*)context_0)->ptr;
         String* nameStr = nullTerm(name_1);
-        printf(\"Context ref: %lx\\n\", ctx);
+        printf(\"Context ref in create-module: %lx\\n\", ctx);
         LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(nameStr->buffer, ctx);
 
         if (mod) {
             Value *v = opaqueValue(mod, &dispose_llvm_module);
+            printf(\"Module ref: %lx\\n\", mod);
             dec_and_free((Value *)nameStr, 1);
             dec_and_free(context_0, 1);
             return maybe((List *)0, (Value *)0, v);
