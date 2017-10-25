@@ -116,7 +116,7 @@ void dispose_llvm_module(void *module) {
 (main [& args]
     (llvm-initialize-all-target-infos)
 
-;    (println "Available targets: " (list-targets))
+    (println "Available targets: " (list-targets))
 
     (or
         (and 
