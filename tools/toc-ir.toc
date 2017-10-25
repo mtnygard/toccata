@@ -1,16 +1,19 @@
 (inline C "
 #include \"llvm-c/Core.h\"
+#include \"llvm-c/ExecutionEngine.h\"
+#include \"llvm-c/Target.h\"
+
 
 void destroy_llvm_context(void *ctx) {
     if(ctx) {
-        printf(\"Disposing context: %lx\\n\", ctx);
+        printf(\"Disposing context: %p\\n\", ctx);
         LLVMContextDispose((LLVMContextRef)ctx);
     }
 }
 
 void dispose_llvm_module(void *module) {
     if (module) {
-        printf(\"Disposing module: %lx\\n\", module);
+        printf(\"Disposing module: %p\\n\", module);
         LLVMDisposeModule((LLVMModuleRef)module);
     }
 }
@@ -21,7 +24,7 @@ void dispose_llvm_module(void *module) {
         LLVMContextRef ctx = LLVMContextCreate();
 
         if (ctx) {
-            printf(\"Context ref: %lx\\n\", ctx);
+            printf(\"Context ref: %p\\n\", ctx);
             Value* v = opaqueValue(ctx, &destroy_llvm_context);
             return(maybe((List *)0, (Value *)0, v));
         } else {
@@ -33,31 +36,98 @@ void dispose_llvm_module(void *module) {
     (inline C Maybe "
         LLVMContextRef ctx = ((Opaque*)context_0)->ptr;
         String* nameStr = nullTerm(name_1);
-        printf(\"Context ref in create-module: %lx\\n\", ctx);
+        printf(\"Context ref in create-module: %p\\n\", ctx);
         LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(nameStr->buffer, ctx);
 
         if (mod) {
             Value *v = opaqueValue(mod, &dispose_llvm_module);
-            printf(\"Module ref: %lx\\n\", mod);
+            printf(\"Module ref: %p\\n\", mod);
             dec_and_free((Value *)nameStr, 1);
-            dec_and_free(context_0, 1);
             return maybe((List *)0, (Value *)0, v);
         } else {
             dec_and_free((Value *)nameStr, 1);
-            dec_and_free(context_0, 1);
             return nothing;
         }
     "))
 
+(defn llvm-link-in-interpreter []
+    (inline C Integer "LLVMLinkInInterpreter();"))
 
-(defn fooish [llvm]
-    (let [x (flat-map llvm (fn [c] (llvm-context-create-module c "foo")))]
-        (println "module has value?" (and x "yes"))
-        ))
+(defn llvm-initialize-all-target-infos []
+    (inline C "LLVMInitializeAllTargetInfos(); return integerValue(1);"))
+
+(defn llvm-initialize-native-target []
+    (inline C "
+        if (0 == LLVMInitializeNativeTarget()) {
+            return maybe((List *)0, (Value *)0, integerValue(1));
+        } else {
+            return nothing;
+        }"))
+
+(defn llvm-initialize-native-asm-parser []
+    (inline C "
+        if (0 == LLVMInitializeNativeAsmParser()) {
+            return maybe((List *)0, (Value *)0, integerValue(1));
+        } else {
+            return nothing;
+        }"))
+
+(defn llvm-initialize-native-asm-printer []
+    (inline C "
+        if (0 == LLVMInitializeNativeAsmPrinter()) {
+            return maybe((List *)0, (Value *)0, integerValue(1));
+        } else {
+            return nothing;
+        }"))
+
+(defn llvm-initialize-native-disassembler []
+    (inline C "
+        if (0 == LLVMInitializeNativeDisassembler()) {
+            return maybe((List *)0, (Value *)0, integerValue(1));
+        } else {
+            return nothing;
+        }"))
+
+(defn list-targets []
+  (inline C List "
+    List *output = empty_list;
+    Value *item;
+    LLVMTargetRef target = LLVMGetFirstTarget();
+
+    if (target == NULL) {
+        printf(\"Really? No targets? Not one little letter?\\n\");
+    }
+
+    while (target != NULL) {
+        char* targetName = LLVMGetTargetName(target);
+
+        if (targetName != NULL) {
+            output = listCons(stringValue(targetName), output);
+        }
+
+        target = LLVMGetNextTarget(target);
+    }
+
+    return (Value*)output;"))
+
+(defn llvm-get-default-target-triple []
+    (inline C  "return stringValue(LLVMGetDefaultTargetTriple());"))
 
 (main [& args]
-    (let [llvm (llvm-context-create)]
+    (llvm-initialize-all-target-infos)
+
+;    (println "Available targets: " (list-targets))
+
+    (or
+        (and 
+            (llvm-initialize-native-target)
+            (llvm-initialize-native-asm-parser)
+            (llvm-initialize-native-asm-printer)
+            (llvm-initialize-native-disassembler))
+        (println "Cannot initialize native target"))
+
+    (let [llvm (llvm-context-create)
+          x    (flat-map llvm (fn [c] (llvm-context-create-module c "foo")))]
         (println "llvm has value?" (and llvm "yes"))
-        (fooish llvm)
-        (println "This is the day")
-        ))
+        (println "module has value?" (and x "yes"))
+        (println "This is the day")))
