@@ -52,6 +52,7 @@ RUN \
     chown -R $USER:$USER toccata && \
     chmod -R u=rw,go=r,a+X toccata && \
     chmod u+x toccata/run
+RUN git clone https://github.com/brendangregg/FlameGraph.git
 
 USER $USER
 
