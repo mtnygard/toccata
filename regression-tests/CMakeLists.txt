@@ -24,6 +24,8 @@ set(test_sources
 file(GENERATE OUTPUT build-test
      CONTENT "#!/bin/bash\nTOCCATA_DIR=${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/toccata $@\n")
 
+set(CMAKE_C_FLAGS "-O3")
+
 foreach(test ${test_sources})
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${test}.c 
         COMMAND sh ${CMAKE_BINARY_DIR}/build-test ${CMAKE_CURRENT_SOURCE_DIR}/${test}.toc >${CMAKE_CURRENT_BINARY_DIR}/${test}.c
@@ -33,7 +35,8 @@ foreach(test ${test_sources})
 
     add_executable(${test} ${CMAKE_CURRENT_BINARY_DIR}/${test}.c)
     target_link_libraries(${test} toccata-core Threads::Threads)
-
+    set_property(TARGET ${test} PROPERTY C_STANDARD 99)
+    
     add_test(NAME ${test} 
              COMMAND ${test})
 endforeach(test)

@@ -10,6 +10,8 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
+set(CMAKE_C_FLAGS "-O3")
+
 llvm_map_components_to_libnames(llvm_libs support core mcjit interpreter AllTargetsInfos X86 ARM AArch64)
     
 include_directories(${CMAKE_SOURCE_DIR})   
@@ -18,11 +20,10 @@ foreach(tool ${tool-sources})
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${tool}.c
                     COMMAND toccata ${CMAKE_CURRENT_SOURCE_DIR}/${tool}.toc >${CMAKE_CURRENT_BINARY_DIR}/${tool}.c
                     DEPENDS ${tool}.toc)
-
-    add_definitions(-std=c99)
     
     add_executable(${tool} ${tool}.c)
     target_link_libraries(${tool} toccata-core ${CORE_LIBS} ${llvm_libs})
+    set_property(TARGET ${tool} PROPERTY C_STANDARD 99)
 endforeach(tool)
 
 
