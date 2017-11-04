@@ -1,3 +1,25 @@
+(add-ns rdr (git-dependency "https://github.com/Toccata-Lang/reader.git"
+                            "reader.toc"
+                            :sha "856857e"))
+(add-ns rd (git-dependency "https://github.com/Toccata-Lang/recursive-descent.git"
+                           "recursive-descent.toc"
+                           :sha "cfa630d"))
+(add-ns grmr (git-dependency "https://github.com/Toccata-Lang/grammar.git"
+                             "grammar.toc"
+                             :sha "1616a3a"))
+(add-ns sys (git-dependency "https://github.com/Toccata-Lang/system.git"
+                            "system.toc"
+                            :sha "956a8bb"))
+(add-ns sm (git-dependency "https://github.com/Toccata-Lang/state-maybe.git"
+                           "state-maybe.toc"
+                           :sha "b41dd1d"))
+(add-ns fio (git-dependency "https://github.com/Toccata-Lang/file-io.git"
+                            "file-io.toc"
+                            :sha "e67c808"))
+(add-ns ast (git-dependency "https://github.com/Toccata-Lang/ast.git"
+                            "ast.toc"
+                            :sha "8aabae3"))
+
 (inline C "
 #include \"llvm-c/Core.h\"
 #include \"llvm-c/ExecutionEngine.h\"
@@ -113,6 +135,28 @@ void dispose_llvm_module(void *module) {
 (defn llvm-get-default-target-triple []
     (inline C  "return stringValue(LLVMGetDefaultTargetTriple());"))
 
+(defprotocol CodeEmitter
+  (codegen [this context module ] "Emit code in the given context and module."))
+
+;(defrecord OpPlus [lhs rhs]
+;  (codegen [this context module ]
+;    (let [left-code (codegen lhs context module builder)
+;          right-code (codegen rhs context module builder)]
+;        (create-fadd builder left-code right-code "addtmp"))))
+
+(defn emit-int-expr [context module val]
+    (inline C "
+        LLVMContextRef ctx = ((Opaque*)context_0)->ptr;
+        int64_t v = ((Integer*)val_2)->numVal;
+        LLVMTypeRef type = LLVMInt64TypeInContext(ctx);
+        dec_and_free(val_2, 1);
+        return opaqueValue(LLVMConstReal(type, v), NULL);"))
+
+(deftype ConstInt [val]
+  CodeEmitter
+  (codegen [this context module]
+    (emit-int-expr context module val)))
+
 (main [& args]
     (llvm-initialize-all-target-infos)
 
@@ -127,7 +171,12 @@ void dispose_llvm_module(void *module) {
         (println "Cannot initialize native target"))
 
     (let [llvm (llvm-context-create)
-          x    (flat-map llvm (fn [c] (llvm-context-create-module c "foo")))]
+          x    (llvm-context-create-module (extract llvm) "foo")]
         (println "llvm has value?" (and llvm "yes"))
         (println "module has value?" (and x "yes"))
+
+        (codegen (ConstInt 12345) (extract llvm) x)
+
         (println "This is the day")))
+
+
