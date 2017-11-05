@@ -10,11 +10,13 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 include_directories(${LLVM_INCLUDE_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-set(CMAKE_C_FLAGS "-O3")
+set(CMAKE_C_FLAGS "-O3 -g")
 
 llvm_map_components_to_libnames(llvm_libs support core mcjit interpreter AllTargetsInfos X86 ARM AArch64)
     
 include_directories(${CMAKE_SOURCE_DIR})   
+
+set(CMAKE_INCLUDE_CURRENT_DIR "on")
 
 file(GENERATE OUTPUT build-toc
      CONTENT "#!/bin/bash\nTOCCATA_DIR=${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/toccata $@\n")

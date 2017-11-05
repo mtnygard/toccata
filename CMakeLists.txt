@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.9.0)
 
 project(toccata VERSION 0.1.0)
 
-set(CMAKE_C_FLAGS "-O3")
+set(CMAKE_C_FLAGS "-O3 -g")
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
