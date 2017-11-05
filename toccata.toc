@@ -972,8 +972,8 @@
           _ (new-module-def defined-sym (c-code c-var [] [] type-num {}))]
       [(c-code "" [] ["Value *" c-var " = " (.txt ast) ";" line-sep] type-num {})]))
 
-  ;; why test for lang equality, then emit c code? Does something else guarantee target-lang is always C when arriving here?
   (emit-definition [ast]
+    ;; why test for lang equality, then emit c code? Does something else guarantee target-lang is always C when arriving here?
     (for [target-lang (sm/get-val .target-lang)
           :when (= (.lang ast) target-lang)
           type-num (get-type-number (.result-type ast))]
