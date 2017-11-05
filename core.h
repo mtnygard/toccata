@@ -1,3 +1,5 @@
+#ifndef __CORE_H
+#define __CORE_H
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -251,3 +253,5 @@ Value *addFutureAction(Future *p, Value *action);
 String *nullTerm(Value *s);
 void show(Value *v);
 int64_t countSeq(Value *seq);
+
+#endif /* __CORE_H */
