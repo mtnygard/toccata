@@ -21,10 +21,57 @@
                             :sha "8aabae3"))
 
 (inline C "
-#include \"llvm-c/Core.h\"
-#include \"llvm-c/ExecutionEngine.h\"
-#include \"llvm-c/Target.h\"
 
+#include <stdio.h>
+
+#include <llvm-c/Core.h>
+#include <llvm-c/Analysis.h>
+#include <llvm-c/ExecutionEngine.h>
+#include <llvm-c/Target.h>
+
+Value* wrap(void* ptr, Destructor destruct) {
+    if(ptr) {
+        return maybe((List *)NULL, (Value *)NULL, opaqueValue(ptr, destruct));
+    } else {
+        return nothing;
+    }
+}
+
+typedef struct {
+    Vector* originalVector;
+    void* contents[];
+} nakedVector;
+
+void freeVectorContents(void* val) {
+    nakedVector* vec = (nakedVector*)val;
+    for(int i = 0; i < vec->originalVector->count; i++) {
+        dec_and_free(vec->contents[i], 1);
+    }
+    dec_and_free((Value*)(vec->originalVector), 1);
+    free(vec);
+}
+
+/* Return array of pointers to the opaque values' contents from the vector.
+   Passing a vector of anything other than Opaque is undefined.
+*/
+Value* vectorContents(Vector* vec) {
+    nakedVector* result = malloc(sizeof(Value*) + (sizeof(void*) * vec->count));
+
+    if (!result) {
+        return NULL;
+    }
+
+    incRef((Value*)vec, 1);
+    result->originalVector = vec;
+    for(unsigned int i = 0; i < vec->count; i++) {
+        /* Copied from vectorGet in core.c */
+        Value *val = vectGet(vec, i);
+        incRef(val, 1);
+        result->contents[i] = ((Opaque*)val)->ptr;
+    }
+
+    return (Value*)opaqueValue(result, &freeVectorContents);
+}
 
 void destroy_llvm_context(void *ctx) {
     if(ctx) {
@@ -44,14 +91,7 @@ void dispose_llvm_module(void *module) {
 (defn llvm-context-create []
     (inline C Maybe "
         LLVMContextRef ctx = LLVMContextCreate();
-
-        if (ctx) {
-            printf(\"Context ref: %p\\n\", ctx);
-            Value* v = opaqueValue(ctx, &destroy_llvm_context);
-            return(maybe((List *)0, (Value *)0, v));
-        } else {
-            return(nothing);
-        }
+        return wrap(ctx, &destroy_llvm_context);
     "))
 
 (defn llvm-context-create-module [context name]
@@ -61,15 +101,112 @@ void dispose_llvm_module(void *module) {
         printf(\"Context ref in create-module: %p\\n\", ctx);
         LLVMModuleRef mod = LLVMModuleCreateWithNameInContext(nameStr->buffer, ctx);
 
-        if (mod) {
-            Value *v = opaqueValue(mod, &dispose_llvm_module);
-            printf(\"Module ref: %p\\n\", mod);
-            dec_and_free((Value *)nameStr, 1);
-            return maybe((List *)0, (Value *)0, v);
-        } else {
-            dec_and_free((Value *)nameStr, 1);
-            return nothing;
+        dec_and_free((Value *)nameStr, 1);
+
+        return wrap(mod, &dispose_llvm_module);
+    "))
+
+(defn llvm-verify-module [mod]
+    (inline C Maybe "
+        LLVMModuleRef mod = ((Opaque*)mod_0)->ptr;
+        char *error = NULL;
+        LLVMVerifyModule(mod, LLVMAbortProcessAction, &error);
+        Value* err = stringValue(error);
+        LLVMDisposeMessage(error);
+        return wrap(err, NULL);
+    "))
+
+
+(defn llvm-create-builder []
+    (inline C Maybe "
+        return wrap(LLVMCreateBuilder(), NULL);
+    "))
+
+(defn llvm-position-builder-at-end [builder block]
+    (inline C Maybe "
+        LLVMBuilderRef builder = ((Opaque*)builder_0)->ptr;
+        LLVMBasicBlockRef bb = ((Opaque*)block_1)->ptr;
+        LLVMPositionBuilderAtEnd(builder, bb);
+        dec_and_free(block_1, 1);
+        return builder_0;
+    "))
+
+(defn llvm-build-add [builder param1 param2 name]
+    (inline C Maybe "
+        LLVMBuilderRef builder = ((Opaque*)builder_0)->ptr;
+        LLVMValueRef p1 = ((Opaque*)param1_1)->ptr;
+        LLVMValueRef p2 = ((Opaque*)param2_2)->ptr;
+        String* nameStr = nullTerm(name_3);
+        LLVMValueRef v = LLVMBuildAdd(builder, p1, p2, nameStr->buffer);
+        dec_and_free(builder_0, 1);
+        dec_and_free(param1_1, 1);
+        dec_and_free(param2_2, 1);
+        dec_and_free((Value*)nameStr, 1);
+        return wrap(v, NULL);
+    "))
+
+(defn llvm-build-ret [builder v]
+    (inline C Maybe "
+        LLVMBuilderRef builder = ((Opaque*)builder_0)->ptr;
+        LLVMValueRef v = ((Opaque*)v_1)->ptr;
+        LLVMBuildRet(builder, v);
+        dec_and_free(v_1, 1);
+        return builder_0;
+    "))
+
+;; types are all LLVMTypeRef
+;; param-types - vector of Opaque[type]
+;; returns maybe[LLVMValueRef] where the value is a FunctionRef
+(defn llvm-add-function [module name param-types return-type]
+    (inline C Maybe "
+        LLVMModuleRef module = ((Opaque*) module_0)->ptr;
+        String* nameStr = nullTerm(name_1);
+
+        Value* typesVecVal = vectorContents((Vector*)param_types_2);
+        nakedVector* typesVec = ((Opaque*)typesVecVal)->ptr;
+        LLVMTypeRef* paramTypes = (LLVMTypeRef*)typesVec->contents;
+        int paramCount = typesVec->originalVector->count;
+
+        printf(\"type count in add-function: %d\\n\", paramCount);
+
+        for(int i = 0; i < paramCount; i++) {
+            printf(\"Type ref in add-function: %d = %p\\n\", i, paramTypes[i]);
         }
+
+        LLVMTypeRef returnType = ((Opaque*) return_type_3)->ptr;
+        LLVMTypeRef functionType = LLVMFunctionType(returnType, paramTypes, paramCount, 0);
+        LLVMValueRef newFunction = LLVMAddFunction(module, nameStr->buffer, functionType);
+
+        dec_and_free(typesVecVal, 1);
+        dec_and_free(module_0, 1);
+        dec_and_free((Value*) nameStr, 1);
+        dec_and_free(param_types_2, 1);
+        dec_and_free(return_type_3, 1);
+
+        return wrap(newFunction, NULL);
+    "))
+
+(defn llvm-get-param [fdef idx]
+    (inline C Maybe "
+        LLVMValueRef fn = ((Opaque*)fdef_0)->ptr;
+        int64_t idx = ((Integer*)idx_1)->numVal;
+        LLVMValueRef param = LLVMGetParam(fn, idx);
+        dec_and_free(idx_1, 1);
+        dec_and_free(fdef_0, 1);
+        return wrap(param, NULL);
+    "))
+
+(defn llvm-append-basic-block [fn name]
+    (inline C Maybe "
+        LLVMValueRef function = ((Opaque*)fn_0)->ptr;
+        String* nameStr = nullTerm(name_1);
+
+        LLVMBasicBlockRef bb = LLVMAppendBasicBlock(function, nameStr->buffer);
+
+        dec_and_free((Value *)nameStr, 1);
+        dec_and_free(fn_0, 1);
+
+        return wrap(bb, NULL);
     "))
 
 (defn llvm-link-in-interpreter []
@@ -135,27 +272,38 @@ void dispose_llvm_module(void *module) {
 (defn llvm-get-default-target-triple []
     (inline C  "return stringValue(LLVMGetDefaultTargetTriple());"))
 
-(defprotocol CodeEmitter
-  (codegen [this context module ] "Emit code in the given context and module."))
+(defn llvm-int64-type [context]
+  (inline C "
+    LLVMContextRef ctx = ((Opaque*)context_0)->ptr;
+    LLVMTypeRef type = LLVMInt64TypeInContext(ctx);
+    printf(\"Type ref int64 finder: %p\\n\", type);
+    dec_and_free(context_0, 1);
+    return opaqueValue(type, NULL);
+    "))
 
-;(defrecord OpPlus [lhs rhs]
-;  (codegen [this context module ]
-;    (let [left-code (codegen lhs context module builder)
-;          right-code (codegen rhs context module builder)]
-;        (create-fadd builder left-code right-code "addtmp"))))
+(defn llvm-int32-type [context]
+  (inline C "
+    LLVMContextRef ctx = ((Opaque*)context_0)->ptr;
+    LLVMTypeRef type = LLVMInt32TypeInContext(ctx);
+    printf(\"Type ref int32 finder: %p\\n\", type);
+    dec_and_free(context_0, 1);
+    return opaqueValue(type, NULL);
+    "))
 
-(defn emit-int-expr [context module val]
-    (inline C "
-        LLVMContextRef ctx = ((Opaque*)context_0)->ptr;
-        int64_t v = ((Integer*)val_2)->numVal;
-        LLVMTypeRef type = LLVMInt64TypeInContext(ctx);
-        dec_and_free(val_2, 1);
-        return opaqueValue(LLVMConstReal(type, v), NULL);"))
 
-(deftype ConstInt [val]
-  CodeEmitter
-  (codegen [this context module]
-    (emit-int-expr context module val)))
+(defn dump-module [v]
+  (inline C "
+    LLVMDumpModule(((Opaque*)v_0)->ptr);
+    dec_and_free(v_0, 1);
+    return nothing;
+    "))
+
+(defn dump-value [v]
+  (inline C "
+    LLVMDumpValue(((Opaque*)v_0)->ptr);
+    dec_and_free(v_0, 1);
+    return nothing;
+    "))
 
 (main [& args]
     (llvm-initialize-all-target-infos)
@@ -170,13 +318,31 @@ void dispose_llvm_module(void *module) {
             (llvm-initialize-native-disassembler))
         (println "Cannot initialize native target"))
 
-    (let [llvm (llvm-context-create)
-          x    (llvm-context-create-module (extract llvm) "foo")]
-        (println "llvm has value?" (and llvm "yes"))
-        (println "module has value?" (and x "yes"))
+    (let [llvm    (llvm-context-create)
+          int32   (llvm-int32-type (extract llvm))
+          mod     (llvm-context-create-module (extract llvm) "foo")
+          fdef    (llvm-add-function (extract mod) "foofn" [int32 int32] int32)
+          entry   (llvm-append-basic-block (extract fdef) "entry")
+          builder (llvm-create-builder)
+          _       (llvm-position-builder-at-end (extract builder) (extract entry))
+          v       (llvm-build-add (extract builder) 
+                        (extract (llvm-get-param (extract fdef) 0)) 
+                        (extract (llvm-get-param (extract fdef) 1)) 
+                        "sum")
+          _ (llvm-build-ret (extract builder) (extract v))]
+        (dump-module (extract mod))
+        (llvm-verify-module (extract mod))
+        )
+    
 
-        (codegen (ConstInt 12345) (extract llvm) x)
+;        (println "llvm has value?" (and llvm "yes"))
+;        (println "module has value?" (and x "yes"))
+;        (println "function has value?" (and f "yes"))
+;
 
-        (println "This is the day")))
 
+
+        ;(codegen (ConstInt 12345) (extract llvm) x)
+
+        (println "This is the day"))
 
